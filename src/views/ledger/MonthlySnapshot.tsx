@@ -44,7 +44,7 @@ export default function MonthlySnapshot() {
   };
 
   const assetColumns: ColumnsType<Asset> = [
-    { title: 'SN', dataIndex: 'sn', width: 150 },
+    { title: '资产编号', dataIndex: 'sn', width: 150 },
     {
       title: '状态', dataIndex: 'state', width: 120,
       render: (v: AssetStatus) => <Tag>{AssetStatusLabel[v]}</Tag>,

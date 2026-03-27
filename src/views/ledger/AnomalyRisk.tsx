@@ -77,7 +77,7 @@ export default function AnomalyRisk() {
   // =============================
   const anomalyColumns: ColumnsType<AnomalyRecord> = [
     { title: '记录ID', dataIndex: 'recordId', width: 100 },
-    { title: '资产 SN', dataIndex: 'assetSn', width: 140 },
+    { title: '资产编号', dataIndex: 'assetSn', width: 140 },
     {
       title: '级别',
       dataIndex: 'level',
@@ -111,7 +111,7 @@ export default function AnomalyRisk() {
   ];
 
   const assetColumns: ColumnsType<Asset> = [
-    { title: 'SN', dataIndex: 'sn', width: 140 },
+    { title: '资产编号', dataIndex: 'sn', width: 140 },
     {
       title: '状态',
       dataIndex: 'state',
@@ -205,7 +205,7 @@ export default function AnomalyRisk() {
           <>
             <Descriptions bordered column={1} size="small">
               <Descriptions.Item label="异常ID">{detailRecord.recordId}</Descriptions.Item>
-              <Descriptions.Item label="资产SN">{detailRecord.assetSn}</Descriptions.Item>
+              <Descriptions.Item label="资产编号">{detailRecord.assetSn}</Descriptions.Item>
               <Descriptions.Item label="异常类型">{AnomalyTypeLabel[detailRecord.type]}</Descriptions.Item>
               <Descriptions.Item label="发现时间">{dayjs(detailRecord.detectedAt).format('YYYY-MM-DD HH:mm')}</Descriptions.Item>
             </Descriptions>

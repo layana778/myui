@@ -51,6 +51,7 @@ export const router = createBrowserRouter([
         ),
         children: [
           { index: true, element: <Navigate to="/warehouse/submit" replace /> },
+          { path: 'dashboard', element: <Wrap><AssetDashboard /></Wrap> },
           { path: 'submit', element: <Wrap><SubmitWorkbench /></Wrap> },
           { path: 'my-logs', element: <Wrap><MySubmissions /></Wrap> },
         ],

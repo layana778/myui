@@ -23,7 +23,7 @@ export default function PendingAudit() {
 
   const columns: ColumnsType<EnrichedAssetLog> = [
     { title: '流水号', dataIndex: 'logId', width: 160 },
-    { title: '申请资产', dataIndex: 'assetSn', width: 140, render: (v) => <a href={`/ledger/trace?sn=${v}`}>{v}</a> },
+    { title: '资产编号', dataIndex: 'assetSn', width: 140, render: (v) => <a href={`/ledger/trace?sn=${v}`}>{v}</a> },
     {
       title: '申请操作', dataIndex: 'action', width: 120,
       render: (v) => <Tag color="blue">{OperationActionLabel[v as keyof typeof OperationActionLabel] || v}</Tag>,

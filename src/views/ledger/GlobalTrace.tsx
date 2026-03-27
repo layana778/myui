@@ -7,7 +7,7 @@ import { type AssetLog, OperationActionLabel, AssetStatusLabel } from '@/core/ty
 
 const columns: ColumnsType<AssetLog> = [
   { title: '流水号', dataIndex: 'logId', width: 100 },
-  { title: '资产 SN', dataIndex: 'assetSn', width: 140 },
+  { title: '资产编号', dataIndex: 'assetSn', width: 140 },
   {
     title: '操作类型', dataIndex: 'action', width: 120,
     render: (v) => <Tag color="blue">{OperationActionLabel[v as keyof typeof OperationActionLabel] || v}</Tag>,
@@ -42,7 +42,7 @@ export default function GlobalTrace() {
     <div>
       <Card title="🔍 全局流水溯源" extra={
         <Input.Search
-          placeholder="输入资产 SN 穿透查询"
+          placeholder="输入资产编号穿透查询"
           allowClear
           style={{ width: 300 }}
           onSearch={setSearchSn}

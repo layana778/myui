@@ -22,7 +22,7 @@ export default function SubmitWorkbench() {
   const [targetUnmountKeys, setTargetUnmountKeys] = useState<string[]>([]);
   const [isValidating, setIsValidating] = useState(false);
 
-  // 🔴 核心风控：防抖校验资产 SN (onBlur触发)
+  // 🔴 核心风控：防抖校验资产编号 (onBlur触发)
   const validateAssetSn = useCallback(
     debounce(async (sn: string, action: OperationAction) => {
       if (!sn) return Promise.resolve();
@@ -141,11 +141,11 @@ export default function SubmitWorkbench() {
 
           <Form.Item
             name="assetSn"
-            label={currentAction === OperationAction.UNMOUNT ? '目标主机资产编码 (SN)' : '操作资产编码 (SN)'}
+            label={currentAction === OperationAction.UNMOUNT ? '目标主机资产编号' : '操作资产编号'}
             validateTrigger="onBlur"
             hasFeedback
             rules={[
-              { required: true, message: '请使用条码枪扫描或手动输入 SN' },
+              { required: true, message: '请使用条码枪扫描或手动输入资产编号' },
               {
                 validator: async (_, value) => {
                   const action = form.getFieldValue('action');
@@ -235,7 +235,7 @@ export default function SubmitWorkbench() {
             <Form.Item
               name="childSnsToMount"
               label="需装入的配件条码 (扫码录入)"
-              rules={[{ required: true, message: '必须提供至少一个配件SN' }]}
+              rules={[{ required: true, message: '必须提供至少一个配件资产编号' }]}
             >
               <Select mode="tags" style={{ width: '100%' }} placeholder="条码枪连续扫码输入..." />
             </Form.Item>
@@ -253,7 +253,7 @@ export default function SubmitWorkbench() {
                 render={(item) => item.title}
                 listStyle={{ width: 340, height: 260 }}
                 operations={['执行拆除', '撤销拆除']}
-                locale={{ itemUnit: '项', itemsUnit: '项', notFoundContent: '请先输入有效的主机SN' }}
+                locale={{ itemUnit: '项', itemsUnit: '项', notFoundContent: '请先输入有效的主机资产编号' }}
               />
             </Form.Item>
           )}

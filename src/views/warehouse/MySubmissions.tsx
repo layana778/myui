@@ -7,7 +7,7 @@ import { OperationActionLabel, AssetStatusLabel } from '@/core/types';
 
 const columns: ColumnsType<EnrichedAssetLog> = [
   { title: '流水号', dataIndex: 'logId', width: 130 },
-  { title: '资产 SN', dataIndex: 'assetSn', width: 140 },
+  { title: '资产编号', dataIndex: 'assetSn', width: 140 },
   {
     title: '操作类型', dataIndex: 'action', width: 120,
     render: (v) => <Tag color="blue">{OperationActionLabel[v as keyof typeof OperationActionLabel] || v}</Tag>,
