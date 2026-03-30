@@ -14,15 +14,20 @@ const statusColorMap: Record<AssetStatus, string> = {
 
 export default function AssetDashboard() {
   const [searchSn, setSearchSn] = useState('');
+  const [filterState, setFilterState] = useState<AssetStatus | null>(null);
   const [detailAsset, setDetailAsset] = useState<Asset | null>(null);
   const { assets } = useDataStore();
 
-  const filteredAssets = searchSn
-    ? assets.filter((asset) => asset.sn.toLowerCase().includes(searchSn.toLowerCase()))
-    : assets;
+  let filteredAssets = assets;
+  if (filterState) {
+    filteredAssets = filteredAssets.filter((a) => a.state === filterState);
+  }
+  if (searchSn) {
+    filteredAssets = filteredAssets.filter((asset) => asset.sn.toLowerCase().includes(searchSn.toLowerCase()));
+  }
 
-  const total = filteredAssets.length;
-  const inUse = filteredAssets.filter((a) => a.state === AssetStatus.IN_USE).length;
+  const total = assets.length;
+  const inUse = assets.filter((a) => a.state === AssetStatus.IN_USE).length;
   const anomaly = assets.filter((a) => a.state === AssetStatus.ANOMALY_PENDING).length;
   const inTransit = assets.filter((a) => a.state === AssetStatus.IN_TRANSIT).length;
 
@@ -41,7 +46,8 @@ export default function AssetDashboard() {
       onFilter: (value, record) => record.state === value,
     },
     { title: '品牌', dataIndex: 'brand', width: 100 },
-    { title: '型号', dataIndex: 'model', width: 160 },
+    { title: '型号', dataIndex: 'model', width: 150 },
+    { title: '使用位置', dataIndex: 'location', width: 180, render: (v) => v || '-' },
     { title: '类别', dataIndex: 'category', width: 100 },
     { title: '父资产', dataIndex: 'parentId', width: 130, render: (v) => v || '-' },
     {
@@ -54,10 +60,42 @@ export default function AssetDashboard() {
   return (
     <div>
       <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col span={6}><Card><Statistic title="资产总数" value={total} /></Card></Col>
-        <Col span={6}><Card><Statistic title="使用中" value={inUse} valueStyle={{ color: '#52c41a' }} /></Card></Col>
-        <Col span={6}><Card><Statistic title="在途" value={inTransit} valueStyle={{ color: '#1677ff' }} /></Card></Col>
-        <Col span={6}><Card><Statistic title="异常挂账" value={anomaly} valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
+        <Col span={6}>
+          <Card 
+            hoverable 
+            onClick={() => setFilterState(null)}
+            style={{ borderColor: filterState === null ? '#1677ff' : undefined, borderWidth: filterState === null ? 2 : 1 }}
+          >
+            <Statistic title="资产总数 (点击看全部)" value={total} />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card 
+            hoverable 
+            onClick={() => setFilterState(AssetStatus.IN_USE)}
+            style={{ borderColor: filterState === AssetStatus.IN_USE ? '#52c41a' : undefined, borderWidth: filterState === AssetStatus.IN_USE ? 2 : 1 }}
+          >
+            <Statistic title="使用中" value={inUse} valueStyle={{ color: '#52c41a' }} />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card 
+            hoverable 
+            onClick={() => setFilterState(AssetStatus.IN_TRANSIT)}
+            style={{ borderColor: filterState === AssetStatus.IN_TRANSIT ? '#1677ff' : undefined, borderWidth: filterState === AssetStatus.IN_TRANSIT ? 2 : 1 }}
+          >
+            <Statistic title="在途" value={inTransit} valueStyle={{ color: '#1677ff' }} />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card 
+            hoverable 
+            onClick={() => setFilterState(AssetStatus.ANOMALY_PENDING)}
+            style={{ borderColor: filterState === AssetStatus.ANOMALY_PENDING ? '#ff4d4f' : undefined, borderWidth: filterState === AssetStatus.ANOMALY_PENDING ? 2 : 1 }}
+          >
+            <Statistic title="异常挂账" value={anomaly} valueStyle={{ color: '#ff4d4f' }} />
+          </Card>
+        </Col>
       </Row>
 
       <Card 
@@ -97,6 +135,7 @@ export default function AssetDashboard() {
             <Descriptions.Item label="当前状态">
               <Tag color={statusColorMap[detailAsset.state]}>{AssetStatusLabel[detailAsset.state]}</Tag>
             </Descriptions.Item>
+            <Descriptions.Item label="使用位置">{detailAsset.location || '未知'}</Descriptions.Item>
             <Descriptions.Item label="最新凭证单号">{detailAsset.latestVoucherNo || '无'}</Descriptions.Item>
             
             <Descriptions.Item label="主板">

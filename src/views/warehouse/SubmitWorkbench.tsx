@@ -23,9 +23,8 @@ export default function SubmitWorkbench() {
   const [targetUnmountKeys, setTargetUnmountKeys] = useState<string[]>([]);
   const [isValidating, setIsValidating] = useState(false);
 
-  // 🔴 核心风控：防抖校验资产编号 (onBlur触发)
-  const validateAssetSn = useCallback(
-    debounce(async (sn: string, action: OperationAction) => {
+  // 🔴 核心风控：校验资产编号 (onBlur触发)
+  const validateAssetSn = useCallback(async (sn: string, action: OperationAction) => {
       if (!sn) return Promise.resolve();
       setIsValidating(true);
       try {
@@ -35,11 +34,39 @@ export default function SubmitWorkbench() {
           return Promise.reject(new Error('阻断：该资产当前存在红灯异常(已被冻结)，禁止流转！'));
         }
 
+        const assets = useDataStore.getState().assets;
+        const targetAsset = assets.find((a) => a.sn === sn);
+
+        if (!targetAsset) {
+          setMountedAccessories([]);
+          return Promise.reject(new Error('台账中未找到此资产，请核对编号'));
+        }
+
         if (action === OperationAction.UNMOUNT) {
-          setMountedAccessories([
-            { key: 'GPU-3090-A01', title: 'RTX 3090 显卡 (SN: GPU-3090-A01)', description: '状态: IN_USE' },
-            { key: 'MEM-64G-B02', title: '64G 内存条 (SN: MEM-64G-B02)', description: '状态: IN_USE' },
-          ]);
+          if (!targetAsset.childrenSns || targetAsset.childrenSns.length === 0) {
+            setMountedAccessories([]);
+            return Promise.resolve();
+          }
+          
+          const accessories = targetAsset.childrenSns.map((childSnOrText) => {
+            const childAsset = assets.find((a) => a.sn === childSnOrText);
+            if (childAsset) {
+              return {
+                key: childAsset.sn,
+                title: `${childAsset.brand || ''} ${childAsset.model || ''} (${childAsset.category}) - SN: ${childAsset.sn}`,
+                description: `状态: ${childAsset.state}`,
+              };
+            } else {
+              // 兼容纯文本组件标签 (例如 "CPU: i9 13900K")
+              return {
+                key: childSnOrText,
+                title: `🔧 ${childSnOrText}`,
+                description: `原主机随附组件`,
+              };
+            }
+          });
+          
+          setMountedAccessories(accessories);
         } else {
           setMountedAccessories([]);
         }
@@ -48,9 +75,7 @@ export default function SubmitWorkbench() {
       } finally {
         setIsValidating(false);
       }
-    }, 500),
-    []
-  );
+    }, []);
 
   const { submitLog } = useDataStore();
 
@@ -77,8 +102,12 @@ export default function SubmitWorkbench() {
     }
     if (values.action === OperationAction.MOUNT) nextStatus = AssetStatus.IN_USE;
 
+    const finalAssetSn = values.action === OperationAction.INBOUND_NEW
+      ? `AST-NEW-${Math.floor(Math.random() * 90000 + 10000)}`
+      : values.assetSn;
+
     submitLog({
-      assetSn: values.assetSn,
+      assetSn: finalAssetSn,
       action: values.action,
       statusBefore: AssetStatus.IN_STOCK, // mock 假设
       statusAfter: nextStatus,
@@ -101,6 +130,11 @@ export default function SubmitWorkbench() {
         targetUser: values.targetUser,
         targetDepartment: values.targetDepartment,
         targetPosition: values.targetPosition,
+        mountName: values.mountName,
+        mountBrand: values.mountBrand,
+        mountModel: values.mountModel,
+        mountNotes: values.mountNotes,
+        targetMountSn: values.targetMountSn,
       }
     });
     
@@ -128,8 +162,8 @@ export default function SubmitWorkbench() {
                 <Select.Option value={OperationAction.INBOUND_NEW}>✨ 新购入库</Select.Option>
                 <Select.Option value={OperationAction.INBOUND_RECYCLE}>♻️ 回收退库</Select.Option>
                 <Select.Option value={OperationAction.TRANSFER}>🔄 库房调配</Select.Option>
-                <Select.Option value={OperationAction.MOUNT}>🔌 挂载配件 (Mount)</Select.Option>
-                <Select.Option value={OperationAction.UNMOUNT}>🛠️ 拆卸配件 (Unmount)</Select.Option>
+                <Select.Option value={OperationAction.MOUNT}>🔌 挂在配件</Select.Option>
+                <Select.Option value={OperationAction.UNMOUNT}>🛠️ 拆卸配件</Select.Option>
               </Select>
             </Form.Item>
 
@@ -144,26 +178,33 @@ export default function SubmitWorkbench() {
             </Form.Item>
           </div>
 
-          <Form.Item
-            name="assetSn"
-            label={currentAction === OperationAction.UNMOUNT ? '目标主机资产编号' : '操作资产编号'}
-            validateTrigger="onBlur"
-            hasFeedback
-            rules={[
-              { required: true, message: '请使用条码枪扫描或手动输入资产编号' },
-              {
-                validator: async (_, value) => {
-                  const action = form.getFieldValue('action');
-                  return validateAssetSn(value, action);
+          {currentAction !== OperationAction.INBOUND_NEW ? (
+            <Form.Item
+              name="assetSn"
+              label={currentAction === OperationAction.UNMOUNT ? '目标主机资产编号' : '操作资产编号'}
+              validateTrigger="onBlur"
+              dependencies={['action']}
+              hasFeedback
+              rules={[
+                { required: true, message: '请使用条码枪扫描或手动输入资产编号' },
+                {
+                  validator: async (_, value) => {
+                    const action = form.getFieldValue('action');
+                    return validateAssetSn(value, action);
+                  },
                 },
-              },
-            ]}
-          >
-            <Input
-              placeholder="支持条码扫码输入"
-              suffix={isValidating && <Spin size="small" />}
-            />
-          </Form.Item>
+              ]}
+            >
+              <Input
+                placeholder="支持条码扫码输入"
+                suffix={isValidating && <Spin size="small" />}
+              />
+            </Form.Item>
+          ) : (
+            <Form.Item label="生成资产编号">
+              <Input disabled value="【系统将按规则自动生成新资产编号】" style={{ color: '#1677ff', fontWeight: 500 }} />
+            </Form.Item>
+          )}
 
           {/* 动态表单 1：新入库详细配置信息 (主要是新购入库) */}
           {currentAction === OperationAction.INBOUND_NEW && (
@@ -182,6 +223,9 @@ export default function SubmitWorkbench() {
                 </Form.Item>
                 <Form.Item name="model" label="型号" style={{ flex: '1 1 30%' }}>
                   <Input placeholder="例如：PowerEdge R740" />
+                </Form.Item>
+                <Form.Item name="location" label="使用位置" style={{ flex: '1 1 30%' }}>
+                  <Input placeholder="例如：北京A栋-1F-机架01" />
                 </Form.Item>
                 <Form.Item name="motherboard" label="主板" style={{ flex: '1 1 30%' }}>
                   <Input placeholder="请填写主板型号 (选填)" />
@@ -202,6 +246,16 @@ export default function SubmitWorkbench() {
                   <Input.TextArea placeholder="资产的其他详细参数或备注说明 (选填)" rows={2} />
                 </Form.Item>
               </div>
+            </div>
+          )}
+
+          {/* 补充位置变更信息 */}
+          {currentAction === OperationAction.TRANSFER && (
+            <div style={{ background: '#f5f5f5', padding: 16, marginBottom: 24, borderRadius: 8 }}>
+              <div style={{ marginBottom: 12, fontWeight: 500 }}>📍 流转去向 (选填)</div>
+              <Form.Item name="location" label="新使用位置">
+                <Input placeholder="调拨入库的新位置，例如：上海B栋-3F-库房" />
+              </Form.Item>
             </div>
           )}
 
@@ -276,32 +330,54 @@ export default function SubmitWorkbench() {
             </div>
           )}
 
-          {/* 动态联动：挂载 */}
+          {/* 动态联动：挂在配件 */}
           {currentAction === OperationAction.MOUNT && (
-            <Form.Item
-              name="childSnsToMount"
-              label="需装入的配件条码 (扫码录入)"
-              rules={[{ required: true, message: '必须提供至少一个配件资产编号' }]}
-            >
-              <Select mode="tags" style={{ width: '100%' }} placeholder="条码枪连续扫码输入..." />
-            </Form.Item>
+            <div style={{ background: '#fafafa', padding: 16, marginBottom: 24, borderRadius: 8 }}>
+              <div style={{ marginBottom: 12, fontWeight: 500 }}>📝 加挂配件信息</div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <Form.Item name="mountName" label="配件名称" rules={[{ required: true }]} style={{ flex: '1 1 45%' }}>
+                  <Input placeholder="例如：显卡 / 内存" />
+                </Form.Item>
+                <Form.Item name="mountBrand" label="品牌" rules={[{ required: true }]} style={{ flex: '1 1 45%' }}>
+                  <Input placeholder="例如：NVIDIA" />
+                </Form.Item>
+                <Form.Item name="mountModel" label="型号" rules={[{ required: true }]} style={{ flex: '1 1 45%' }}>
+                  <Input placeholder="例如：RTX 4090" />
+                </Form.Item>
+              </div>
+              <Form.Item name="mountNotes" label="备注" style={{ marginBottom: 0 }}>
+                <Input.TextArea placeholder="配件相关参数或其他说明" rows={1} />
+              </Form.Item>
+            </div>
           )}
 
           {/* 动态联动：拆卸穿梭框 */}
           {currentAction === OperationAction.UNMOUNT && (
-            <Form.Item label="从主机已挂载配件中选择要拆卸的配件">
-              <Transfer
-                dataSource={mountedAccessories}
-                showSearch
-                filterOption={(inputValue, item) => item.title.indexOf(inputValue) > -1}
-                targetKeys={targetUnmountKeys}
-                onChange={(newTargetKeys) => setTargetUnmountKeys(newTargetKeys as string[])}
-                render={(item) => item.title}
-                listStyle={{ width: 340, height: 260 }}
-                operations={['执行拆除', '撤销拆除']}
-                locale={{ itemUnit: '项', itemsUnit: '项', notFoundContent: '请先输入有效的主机资产编号' }}
-              />
-            </Form.Item>
+            <div style={{ background: '#fafafa', padding: 16, marginBottom: 24, borderRadius: 8 }}>
+              <div style={{ marginBottom: 16, fontWeight: 500 }}>📝 拆卸及流转信息</div>
+              <Form.Item label="从主机已挂载配件中选择要拆卸的配件">
+                <Transfer
+                  dataSource={mountedAccessories}
+                  showSearch
+                  filterOption={(inputValue, item) => item.title.indexOf(inputValue) > -1}
+                  targetKeys={targetUnmountKeys}
+                  onChange={(newTargetKeys) => setTargetUnmountKeys(newTargetKeys as string[])}
+                  render={(item) => item.title}
+                  listStyle={{ width: 340, height: 260 }}
+                  operations={['执行拆除', '撤销拆除']}
+                  locale={{ itemUnit: '项', itemsUnit: '项', notFoundContent: '请先输入有效的主机资产编号' }}
+                />
+              </Form.Item>
+              
+              <Form.Item 
+                name="targetMountSn" 
+                label="拆卸后去向：挂载目标资产编号"
+                rules={[{ required: true, message: '必须指定拆除后挂载的目标主机资产编号' }]}
+                style={{ marginTop: 16, marginBottom: 0 }}
+              >
+                <Input placeholder="输入目标主机资产编号以接收拆卸下的配件" />
+              </Form.Item>
+            </div>
           )}
 
           <Form.Item

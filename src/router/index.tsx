@@ -12,6 +12,7 @@ const NotFound = lazy(() => import('@/views/common/NotFound'));
 // 🏢 懒加载：库管页面 (打包时分离为 chunk-warehouse)
 const SubmitWorkbench = lazy(() => import('@/views/warehouse/SubmitWorkbench'));
 const MySubmissions = lazy(() => import('@/views/warehouse/MySubmissions'));
+const AnomalyTasks = lazy(() => import('@/views/warehouse/AnomalyTasks'));
 
 // 🏦 懒加载：台账管理员页面 (打包时分离为 chunk-ledger)
 const AssetDashboard = lazy(() => import('@/views/ledger/AssetDashboard'));
@@ -54,6 +55,7 @@ export const router = createBrowserRouter([
           { path: 'dashboard', element: <Wrap><AssetDashboard /></Wrap> },
           { path: 'submit', element: <Wrap><SubmitWorkbench /></Wrap> },
           { path: 'my-logs', element: <Wrap><MySubmissions /></Wrap> },
+          { path: 'anomaly-tasks', element: <Wrap><AnomalyTasks /></Wrap> },
         ],
       },
 

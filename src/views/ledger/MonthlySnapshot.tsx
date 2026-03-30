@@ -2,18 +2,20 @@ import React, { useState } from 'react';
 import { Card, Button, Row, Col, Statistic, Table, Tag, message, Descriptions, Divider, Alert } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import { mockAssets, mockAnomalies } from '@/core/mock/data';
+import { useDataStore } from '@/core/store/data';
 import { type Asset, AssetStatus, AssetStatusLabel, AnomalyLevel } from '@/core/types';
 
 export default function MonthlySnapshot() {
   const [isLocking, setIsLocking] = useState(false);
   const [lockedMonth, setLockedMonth] = useState<string | null>(null);
 
+  const { assets, anomalies } = useDataStore();
+
   const currentMonth = dayjs().format('YYYY-MM');
-  const total = mockAssets.length;
-  const inUse = mockAssets.filter((a) => a.state === AssetStatus.IN_USE).length;
-  const anomaly = mockAssets.filter((a) => a.state === AssetStatus.ANOMALY_PENDING).length;
-  const unresolvedRed = mockAnomalies.filter((a) => a.level === AnomalyLevel.RED && !a.isResolved).length;
+  const total = assets.length;
+  const inUse = assets.filter((a) => a.state === AssetStatus.IN_USE).length;
+  const anomaly = assets.filter((a) => a.state === AssetStatus.ANOMALY_PENDING).length;
+  const unresolvedRed = anomalies.filter((a) => a.level === AnomalyLevel.RED && !a.isResolved).length;
 
   const onGenerateSnapshot = async () => {
     if (unresolvedRed > 0) {
@@ -31,7 +33,7 @@ export default function MonthlySnapshot() {
         totalAssets: total,
         inUse,
         anomalyPending: anomaly,
-        assetDigest: mockAssets.map((a) => ({ sn: a.sn, state: a.state, voucher: a.latestVoucherNo })),
+        assetDigest: assets.map((a) => ({ sn: a.sn, state: a.state, voucher: a.latestVoucherNo })),
         fileHash: 'MD5:' + Math.random().toString(36).slice(2, 18).toUpperCase(),
       };
 
@@ -52,6 +54,7 @@ export default function MonthlySnapshot() {
     { title: '类别', dataIndex: 'category', width: 100 },
     { title: '品牌', dataIndex: 'brand', width: 100 },
     { title: '型号', dataIndex: 'model', width: 160 },
+    { title: '所在位置', dataIndex: 'location', width: 160, render: (v) => v || '-' },
     { title: '凭证号', dataIndex: 'latestVoucherNo', width: 200, render: (v) => v || <Tag color="red">缺失</Tag> },
   ];
 
@@ -99,7 +102,7 @@ export default function MonthlySnapshot() {
       >
         <Table<Asset>
           columns={assetColumns}
-          dataSource={mockAssets}
+          dataSource={assets}
           rowKey="sn"
           pagination={false}
           size="small"

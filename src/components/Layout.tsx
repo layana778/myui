@@ -15,6 +15,7 @@ const warehouseMenuItems = [
   { key: '/warehouse/dashboard', icon: <DashboardOutlined />, label: '资产大盘' },
   { key: '/warehouse/submit', icon: <FormOutlined />, label: '资产异动提报' },
   { key: '/warehouse/my-logs', icon: <UnorderedListOutlined />, label: '我的提报记录' },
+  { key: '/warehouse/anomaly-tasks', icon: <AlertOutlined />, label: '❌ 异常整改单' },
 ];
 
 const ledgerMenuItems = [

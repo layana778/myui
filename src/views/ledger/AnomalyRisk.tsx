@@ -1,27 +1,63 @@
 import React, { useMemo, useState } from 'react';
-import { Table, Button, Card, Row, Col, Statistic, message, Badge, Tag, Modal, Descriptions, Divider } from 'antd';
+import { Table, Button, Card, Row, Col, Statistic, message, Badge, Tag, Modal, Descriptions, Divider, Form, Select, Input, Alert, Space, Drawer, Radio } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import {
   type Asset, type AnomalyRecord,
-  AssetStatus, AssetStatusLabel, AnomalyLevel, AnomalyType, AnomalyTypeLabel,
+  AssetStatus, AssetStatusLabel, AnomalyLevel, AnomalyType, AnomalyTypeLabel, AnomalyWarehouseStatus,
 } from '@/core/types';
-import { mockAssets, mockAnomalies } from '@/core/mock/data';
+import { useDataStore } from '@/core/store/data';
+
+/** 根据异常类型获取冲突说明与处理方式描述 */
+function getAnomalyDescription(type: AnomalyType): { conflict: string; solutions: string[] } {
+  switch (type) {
+    case AnomalyType.DUPLICATE_SN:
+      return {
+        conflict: '系统检测到多台物理设备使用相同的出库条形码，存在复用贴码套现或错误录入风险。',
+        solutions: ['为其中一台设备重新生成全新的资产编号，原机保留当前编号。'],
+      };
+    case AnomalyType.ORPHAN_MOVEMENT:
+      return {
+        conflict: '该资产发生了实物异动（位置/状态/挂载变更），但系统中找不到对应的合法OA审批单据。',
+        solutions: ['由台账管理员手动补入OA凭证直接核销。', '驳回至对应仓管限期整改，要求库管补提单据。'],
+      };
+    case AnomalyType.NEGATIVE_INVENTORY:
+      return {
+        conflict: '该资产的流水序列产生了逻辑矛盾（如未入库就出库，或重复出库），导致库存为负值。',
+        solutions: ['由台账管理员手动补入凭证核销。', '驳回至库管确认实际库存后重新对齐。'],
+      };
+    case AnomalyType.HIERARCHY_PARADOX:
+      return {
+        conflict: '该资产的层级关系出现悖论（如自身作为自身的父/子资产，或循环引用）。',
+        solutions: ['由台账管理员手动补入凭证核销。', '驳回至库管核实挂载关系后重新上报。'],
+      };
+    default:
+      return { conflict: '未知异常类型', solutions: ['手动核销'] };
+  }
+}
 
 export default function AnomalyRisk() {
   const [detailRecord, setDetailRecord] = useState<AnomalyRecord | null>(null);
+  const [resolveRecord, setResolveRecord] = useState<AnomalyRecord | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [detailAsset, setDetailAsset] = useState<Asset | null>(null);
+  
+  const {
+    assets, anomalies,
+    resolveAnomaly, resolveDuplicateSn, rejectAnomalyToWarehouse,
+  } = useDataStore();
 
   // =============================
   // 红灯规则引擎 (阻断级)
   // =============================
   const blockedAnomalies = useMemo(
-    () => mockAnomalies.filter((a) => a.level === AnomalyLevel.RED && !a.isResolved),
-    [],
+    () => anomalies.filter((a) => a.level === AnomalyLevel.RED && !a.isResolved),
+    [anomalies],
   );
 
   const missingVoucherAssets = useMemo(
-    () => mockAssets.filter((asset) => !asset.latestVoucherNo || asset.latestVoucherNo.trim() === ''),
-    [],
+    () => assets.filter((asset) => !asset.latestVoucherNo || asset.latestVoucherNo.trim() === ''),
+    [assets],
   );
 
   // =============================
@@ -29,22 +65,22 @@ export default function AnomalyRisk() {
   // =============================
   const longPendingAssets = useMemo(() => {
     const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    return mockAssets.filter(
+    return assets.filter(
       (asset) => asset.state === AssetStatus.ANOMALY_PENDING && asset.versionUpdatedAt < thirtyDaysAgo,
     );
-  }, []);
+  }, [assets]);
 
   const orphanedValuableAssets = useMemo(
     () =>
-      mockAssets.filter(
+      assets.filter(
         (asset) => asset.category === 'GPU' && asset.state === AssetStatus.IN_STOCK && asset.parentId === null,
       ),
-    [],
+    [assets],
   );
 
   const yellowAnomalies = useMemo(
-    () => mockAnomalies.filter((a) => a.level === AnomalyLevel.YELLOW && !a.isResolved),
-    [],
+    () => anomalies.filter((a) => a.level === AnomalyLevel.YELLOW && !a.isResolved),
+    [anomalies],
   );
 
   // =============================
@@ -73,10 +109,25 @@ export default function AnomalyRisk() {
   };
 
   // =============================
+  // 处理核销弹窗的智能分流
+  // =============================
+
+  const handleRejectToWarehouse = () => {
+    if (!resolveRecord || !rejectReason.trim()) {
+      message.warning('请输入驳回理由');
+      return;
+    }
+    rejectAnomalyToWarehouse(resolveRecord.recordId, rejectReason);
+    message.success('已驳回至库管异常整改区，等待库管补签。');
+    setResolveRecord(null);
+    setRejectReason('');
+  };
+
+  // =============================
   // 表格列定义
   // =============================
   const anomalyColumns: ColumnsType<AnomalyRecord> = [
-    { title: '记录ID', dataIndex: 'recordId', width: 100 },
+    { title: '记录ID', dataIndex: 'recordId', width: 130 },
     { title: '资产编号', dataIndex: 'assetSn', width: 140 },
     {
       title: '级别',
@@ -92,6 +143,16 @@ export default function AnomalyRisk() {
       render: (v: AnomalyType) => AnomalyTypeLabel[v] || v,
     },
     {
+      title: '库管协同',
+      dataIndex: 'warehouseStatus',
+      width: 120,
+      render: (v?: string) => {
+        if (v === AnomalyWarehouseStatus.REJECTED_TO_WH) return <Tag color="orange">⏳ 已驳回库管</Tag>;
+        if (v === AnomalyWarehouseStatus.SUBMITTED_BY_WH) return <Tag color="green">✅ 库管已补签</Tag>;
+        return <Tag>待处理</Tag>;
+      },
+    },
+    {
       title: '发现时间',
       dataIndex: 'detectedAt',
       width: 170,
@@ -101,11 +162,18 @@ export default function AnomalyRisk() {
     },
     {
       title: '操作',
-      width: 100,
+      width: 160,
       render: (_, record) => (
-        <Button type="link" size="small" onClick={() => setDetailRecord(record)}>
-          查看现场
-        </Button>
+        <>
+          <Button type="link" size="small" onClick={() => setDetailRecord(record)}>
+            查看现场
+          </Button>
+          {record.warehouseStatus !== AnomalyWarehouseStatus.REJECTED_TO_WH && (
+            <Button type="link" danger size="small" onClick={() => { setResolveRecord(record); setRejectReason(''); }}>
+              处置
+            </Button>
+          )}
+        </>
       ),
     },
   ];
@@ -129,6 +197,140 @@ export default function AnomalyRisk() {
       },
     },
   ];
+
+  // =============================
+  // 智能核销弹窗内容 — 根据异常类型分流
+  // =============================
+  const renderResolveModalContent = () => {
+    if (!resolveRecord) return null;
+    const desc = getAnomalyDescription(resolveRecord.type);
+
+    return (
+      <>
+        <Alert
+          type="error"
+          showIcon
+          message={<strong>冲突项：{AnomalyTypeLabel[resolveRecord.type]}</strong>}
+          description={desc.conflict}
+          style={{ marginBottom: 16 }}
+        />
+
+        <Card size="small" title="📋 可选处置方式" style={{ marginBottom: 16 }}>
+          {desc.solutions.map((s, i) => (
+            <div key={i} style={{ padding: '4px 0', color: '#555' }}>
+              {i + 1}. {s}
+            </div>
+          ))}
+        </Card>
+
+        {/* ====== 一码多机 专属处置 ====== */}
+        {resolveRecord.type === AnomalyType.DUPLICATE_SN && (
+          <div style={{ background: '#fffbe6', padding: 16, borderRadius: 8, border: '1px solid #ffe58f' }}>
+            <div style={{ marginBottom: 12, fontWeight: 600, color: '#d48806' }}>
+              🔄 系统检测到多台设备出现相同的编号 
+              <a 
+                onClick={() => setDetailAsset(assets.find(a => a.sn === resolveRecord.assetSn) || null)}
+                style={{ marginLeft: 8, fontWeight: 'bold' }}
+              >
+                {resolveRecord.assetSn}
+              </a>
+              。请选择需要重新分配编号的实体：
+            </div>
+            <Form
+              layout="vertical"
+              onFinish={(values) => {
+                if (resolveRecord) {
+                  resolveDuplicateSn(resolveRecord.recordId, values.newAssetSn);
+                  message.success(`已为实例 [${values.selectedInstance}] 分配新编号 ${values.newAssetSn}，冲突解除！`);
+                  setResolveRecord(null);
+                }
+              }}
+            >
+              <Form.Item 
+                name="selectedInstance"
+                rules={[{ required: true, message: '请选择要重分配编号的实例' }]}
+              >
+                <Radio.Group>
+                  <Space direction="vertical">
+                    {(((resolveRecord.conflictPayload.externalIncomingData as any)?.found_in as string[]) || []).map((loc: string, idx: number) => (
+                      <Radio key={idx} value={loc}>
+                        实体 {idx + 1}：目前出现在 <strong>{loc}</strong>
+                      </Radio>
+                    ))}
+                    <Radio value="OTHER">其他关联实体</Radio>
+                  </Space>
+                </Radio.Group>
+              </Form.Item>
+              <Row gutter={8} align="middle">
+                <Col flex="auto">
+                  <Form.Item
+                    name="newAssetSn"
+                    rules={[{ required: true, message: '必须输入新的资产编号' }]}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Input placeholder="输入新的资产编号，例如 AST-NEW-02399" />
+                  </Form.Item>
+                </Col>
+                <Col>
+                  <Button type="primary" htmlType="submit">
+                    确认分配
+                  </Button>
+                </Col>
+              </Row>
+            </Form>
+          </div>
+        )}
+
+        {/* ====== 无单据异动 / 其他类型 专属处置 ====== */}
+        {resolveRecord.type !== AnomalyType.DUPLICATE_SN && (
+          <div>
+            {/* 方案A: 手动补签凭证核销 */}
+            <Card size="small" style={{ marginBottom: 12, border: '1px solid #91caff' }}>
+              <div style={{ fontWeight: 600, marginBottom: 8, color: '#0958d9' }}>方案A：手动补入OA凭证直接核销</div>
+              <Form
+                layout="inline"
+                onFinish={(values) => {
+                  if (resolveRecord) {
+                    resolveAnomaly(resolveRecord.recordId, AssetStatus.IN_STOCK, values.resolverVoucherNo);
+                    message.success('已手动补入凭证核销，异常解除！');
+                    setResolveRecord(null);
+                  }
+                }}
+              >
+                <Form.Item
+                  name="resolverVoucherNo"
+                  rules={[{ required: true, message: '请输入凭证号' }]}
+                  style={{ flex: 1 }}
+                >
+                  <Input placeholder="输入OA冲销单号，例如 OA-FIX-20261021" />
+                </Form.Item>
+                <Button type="primary" htmlType="submit">补签核销</Button>
+              </Form>
+            </Card>
+
+            {/* 方案B: 驳回至库管 */}
+            <Card size="small" style={{ border: '1px solid #ffccc7' }}>
+              <div style={{ fontWeight: 600, marginBottom: 8, color: '#cf1322' }}>方案B：驳回至对应仓管限期整改</div>
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Input.TextArea
+                  rows={2}
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="输入驳回理由，例如：凭证缺失，请库管核实后在24小时内补提OA审批单"
+                />
+                <Row justify="end">
+                  <Button onClick={() => setResolveRecord(null)} style={{ marginRight: 8 }}>取消</Button>
+                  <Button type="primary" danger onClick={handleRejectToWarehouse}>
+                    驳回至库管
+                  </Button>
+                </Row>
+              </Space>
+            </Card>
+          </div>
+        )}
+      </>
+    );
+  };
 
   return (
     <div>
@@ -221,6 +423,66 @@ export default function AnomalyRisk() {
           </>
         )}
       </Modal>
+
+      {/* 智能核销弹窗 — 根据异常类型渲染不同处置方案 */}
+      <Modal
+        title={`⚖️ 异常处置：${resolveRecord?.assetSn} — ${resolveRecord ? AnomalyTypeLabel[resolveRecord.type] : ''}`}
+        open={!!resolveRecord}
+        onCancel={() => { setResolveRecord(null); setRejectReason(''); }}
+        footer={null}
+        destroyOnClose
+        width={640}
+      >
+        {renderResolveModalContent()}
+      </Modal>
+
+      {/* 资产详情抽屉 */}
+      <Drawer
+        title={`资产配置详情 - ${detailAsset?.sn}`}
+        width={500}
+        placement="right"
+        onClose={() => setDetailAsset(null)}
+        open={!!detailAsset}
+      >
+        {detailAsset && (
+          <Descriptions column={1} bordered size="small">
+            <Descriptions.Item label="资产编号">{detailAsset.sn}</Descriptions.Item>
+            <Descriptions.Item label="资产类别">{detailAsset.category}</Descriptions.Item>
+            <Descriptions.Item label="品牌">{detailAsset.brand}</Descriptions.Item>
+            <Descriptions.Item label="型号">{detailAsset.model}</Descriptions.Item>
+            <Descriptions.Item label="当前状态">
+              <Tag color="blue">{AssetStatusLabel[detailAsset.state]}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="使用位置">{detailAsset.location || '未知'}</Descriptions.Item>
+            <Descriptions.Item label="最新凭证单号">{detailAsset.latestVoucherNo || '无'}</Descriptions.Item>
+            
+            <Descriptions.Item label="主板">
+              {detailAsset.motherboard || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="CPU">
+              {detailAsset.cpu || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="内存 (RAM)">
+              {detailAsset.ram || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="硬盘 (Storage)">
+              {detailAsset.storage || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="显卡 (GPU)">
+              {detailAsset.gpu || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="父级挂载">
+              {detailAsset.parentId || '独立使用'}
+            </Descriptions.Item>
+            <Descriptions.Item label="下属配件">
+              {detailAsset.childrenSns?.length > 0 ? detailAsset.childrenSns.join(', ') : '无'}
+            </Descriptions.Item>
+            <Descriptions.Item label="备注">
+              {detailAsset.notes || '无'}
+            </Descriptions.Item>
+          </Descriptions>
+        )}
+      </Drawer>
     </div>
   );
 }

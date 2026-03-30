@@ -41,6 +41,7 @@ export interface Asset {
   brand: string;
   model: string;
   category: string;
+  location?: string;
   motherboard?: string;
   cpu?: string;
   ram?: string;
@@ -72,7 +73,7 @@ export const OperationActionLabel: Record<OperationAction, string> = {
   [OperationAction.INBOUND_RECYCLE]: '♻️ 回收退库',
   [OperationAction.OUTBOUND]: '🚚 出库',
   [OperationAction.TRANSFER]: '🔄 库房调配',
-  [OperationAction.MOUNT]: '🔌 挂载配件',
+  [OperationAction.MOUNT]: '🔌 挂在配件',
   [OperationAction.UNMOUNT]: '🛠️ 拆卸配件',
   [OperationAction.AUDIT_RECTIFY]: '盘点核销',
 };
@@ -118,6 +119,20 @@ export const AnomalyTypeLabel: Record<AnomalyType, string> = {
 };
 
 /**
+ * 异常工单库管侧协同状态
+ */
+export const AnomalyWarehouseStatus = {
+  /** 尚未下发给库管 */
+  PENDING: 'PENDING',
+  /** 已驳回至库管待整改 */
+  REJECTED_TO_WH: 'REJECTED_TO_WH',
+  /** 库管已补签待复核 */
+  SUBMITTED_BY_WH: 'SUBMITTED_BY_WH',
+} as const;
+
+export type AnomalyWarehouseStatus = typeof AnomalyWarehouseStatus[keyof typeof AnomalyWarehouseStatus];
+
+/**
  * 核心模型 3: 异常红黄灯记录 (AnomalyRecord)
  */
 export interface AnomalyRecord {
@@ -132,6 +147,12 @@ export interface AnomalyRecord {
   readonly detectedAt: number;
   isResolved: boolean;
   resolverVoucherNo?: string;
+  /** 库管侧协同状态 */
+  warehouseStatus?: AnomalyWarehouseStatus;
+  /** 台账管理员驳回理由 */
+  warehouseRejectReason?: string;
+  /** 库管补签的凭证号 */
+  warehouseSupplementVoucherNo?: string;
 }
 
 /** 角色枚举 */
