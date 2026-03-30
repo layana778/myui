@@ -9,19 +9,19 @@ interface AuthState {
   logout: () => void;
 }
 
-// 初始化时尝试从 localStorage 恢复登录状态
-const stored = localStorage.getItem('auth_user');
+// 初始化时尝试从 sessionStorage 恢复登录状态
+const stored = sessionStorage.getItem('auth_user');
 const initialUser: UserInfo | null = stored ? JSON.parse(stored) : null;
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: initialUser,
   isAuthenticated: !!initialUser,
   login: (user) => {
-    localStorage.setItem('auth_user', JSON.stringify(user));
+    sessionStorage.setItem('auth_user', JSON.stringify(user));
     set({ user, isAuthenticated: true });
   },
   logout: () => {
-    localStorage.removeItem('auth_user');
+    sessionStorage.removeItem('auth_user');
     set({ user: null, isAuthenticated: false });
   },
 }));

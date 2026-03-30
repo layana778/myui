@@ -7,19 +7,40 @@ import { Role } from '@/core/types';
 
 const { Title, Text } = Typography;
 
+import axios from 'axios';
+import { message } from 'antd';
+
 export default function Login() {
   const { login } = useAuthStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const handleLogin = (role: Role) => {
-    const user = role === Role.WAREHOUSE
-      ? { userId: 'WH-001', username: '张库管', role }
-      : { userId: 'LA-001', username: '李台账', role };
-    login(user);
-    const redirect = searchParams.get('redirect');
-    const defaultPage = role === Role.WAREHOUSE ? '/warehouse/submit' : '/ledger/dashboard';
-    navigate(redirect || defaultPage, { replace: true });
+  const handleLogin = async (role: Role) => {
+    try {
+      const userId = role === Role.WAREHOUSE ? 'WH-001' : 'LG-001';
+      const res = await axios.post('/api/auth/login', {
+        user_id: userId,
+        password: '123456'
+      });
+      
+      const APIUser = res.data.user;
+      
+      const user = { 
+        userId: APIUser.id, 
+        username: APIUser.name, 
+        role: APIUser.role 
+      };
+      
+      login(user);
+      
+      const redirect = searchParams.get('redirect');
+      const defaultPage = user.role === Role.WAREHOUSE ? '/warehouse/submit' : '/ledger/dashboard';
+      navigate(redirect || defaultPage, { replace: true });
+      message.success(`欢迎回来，${user.username}！`);
+    } catch (err: any) {
+      console.error(err);
+      message.error(err.response?.data?.detail || '登录失败');
+    }
   };
 
   return (

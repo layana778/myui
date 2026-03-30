@@ -26,12 +26,21 @@ const ledgerMenuItems = [
   { key: '/ledger/snapshot', icon: <CameraOutlined />, label: '月度对账快照' },
 ];
 
+import { useDataStore } from '@/core/store/data';
+
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const { user, logout } = useAuthStore();
+  const { fetchData } = useDataStore();
   const navigate = useNavigate();
   const location = useLocation();
   const { token: { colorBgContainer, borderRadiusLG } } = theme.useToken();
+
+  React.useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [user, fetchData]);
 
   if (!user) return <Navigate to="/login" replace />;
 
