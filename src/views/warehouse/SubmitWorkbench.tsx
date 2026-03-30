@@ -15,6 +15,7 @@ export default function SubmitWorkbench() {
   const [form] = Form.useForm();
 
   const currentAction = Form.useWatch('action', form);
+  const currentCategory = Form.useWatch('category', form);
   const currentVoucherNo = Form.useWatch('voucherNo', form);
   const currentFiles = Form.useWatch('attachments', form);
 
@@ -95,7 +96,11 @@ export default function SubmitWorkbench() {
         ram: values.ram,
         storage: values.storage,
         gpu: values.gpu,
-        notes: values.notes
+        notes: values.notes,
+        manufactureSn: values.manufactureSn,
+        targetUser: values.targetUser,
+        targetDepartment: values.targetDepartment,
+        targetPosition: values.targetPosition,
       }
     });
     
@@ -122,7 +127,7 @@ export default function SubmitWorkbench() {
               <Select>
                 <Select.Option value={OperationAction.INBOUND_NEW}>✨ 新购入库</Select.Option>
                 <Select.Option value={OperationAction.INBOUND_RECYCLE}>♻️ 回收退库</Select.Option>
-                <Select.Option value={OperationAction.TRANSFER}>🔄 调拨 (Transfer)</Select.Option>
+                <Select.Option value={OperationAction.TRANSFER}>🔄 库房调配</Select.Option>
                 <Select.Option value={OperationAction.MOUNT}>🔌 挂载配件 (Mount)</Select.Option>
                 <Select.Option value={OperationAction.UNMOUNT}>🛠️ 拆卸配件 (Unmount)</Select.Option>
               </Select>
@@ -204,30 +209,71 @@ export default function SubmitWorkbench() {
           {currentAction === OperationAction.INBOUND_RECYCLE && (
             <div style={{ background: '#fafafa', padding: 16, marginBottom: 24, borderRadius: 8 }}>
               <div style={{ marginBottom: 12, fontWeight: 500 }}>📝 回收资产归档补齐</div>
-              <div style={{ display: 'flex', gap: 16 }}>
-                <Form.Item name="category" label="资产类别" required style={{ flex: 1 }}>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <Form.Item name="category" label="资产类别" required style={{ flex: '1 1 100%' }}>
                   <Select placeholder="请选择类别">
                     <Select.Option value="HOST">主机</Select.Option>
                     <Select.Option value="MONITOR">显示器</Select.Option>
                     <Select.Option value="OTHER">其他</Select.Option>
                   </Select>
                 </Form.Item>
+
+                {currentCategory === 'HOST' && (
+                  <>
+                    <Form.Item name="motherboard" label="主板" style={{ flex: '1 1 30%' }}>
+                      <Input placeholder="主板型号" />
+                    </Form.Item>
+                    <Form.Item name="cpu" label="CPU" style={{ flex: '1 1 30%' }}>
+                      <Input placeholder="CPU型号" />
+                    </Form.Item>
+                    <Form.Item name="ram" label="内存" style={{ flex: '1 1 30%' }}>
+                      <Input placeholder="内存容量/规格" />
+                    </Form.Item>
+                    <Form.Item name="storage" label="硬盘" style={{ flex: '1 1 30%' }}>
+                      <Input placeholder="硬盘规格" />
+                    </Form.Item>
+                    <Form.Item name="gpu" label="显卡" style={{ flex: '1 1 30%' }}>
+                      <Input placeholder="显卡型号" />
+                    </Form.Item>
+                    <Form.Item name="manufactureSn" label="设备原厂SN" style={{ flex: '1 1 30%' }}>
+                      <Input placeholder="设备出厂编号" />
+                    </Form.Item>
+                  </>
+                )}
+
+                {(currentCategory === 'MONITOR' || currentCategory === 'OTHER') && (
+                  <>
+                    <Form.Item name="brand" label="品牌" style={{ flex: '1 1 45%' }}>
+                      <Input placeholder="例如：Dell / Lenovo" />
+                    </Form.Item>
+                    <Form.Item name="model" label="型号" style={{ flex: '1 1 45%' }}>
+                      <Input placeholder="例如：U2419H" />
+                    </Form.Item>
+                  </>
+                )}
               </div>
-              <Form.Item name="notes" label="回收备注说明" style={{ marginBottom: 0 }}>
+              <Form.Item name="notes" label="回收备注说明" style={{ marginBottom: 0, marginTop: 12 }}>
                 <Input.TextArea placeholder="简要说明资产成色或特殊情况 (选填)" rows={1} />
               </Form.Item>
             </div>
           )}
 
-          {/* 动态联动：调拨 */}
+          {/* 动态联动：库房调配 */}
           {currentAction === OperationAction.TRANSFER && (
-            <Form.Item name="targetLocation" label="调拨目标库房/机房" rules={[{ required: true }]}>
-              <Select placeholder="请选择目标机房">
-                <Select.Option value="BJ_ROOM_A">北京兆维 A 栋</Select.Option>
-                <Select.Option value="SH_ROOM_B">上海移动 B 栋</Select.Option>
-                <Select.Option value="GZ_ROOM_C">广州天河 C 栋</Select.Option>
-              </Select>
-            </Form.Item>
+            <div style={{ background: '#fafafa', padding: 16, marginBottom: 24, borderRadius: 8 }}>
+              <div style={{ marginBottom: 12, fontWeight: 500 }}>📝 库房调配目标信息</div>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <Form.Item name="targetUser" label="使用人" rules={[{ required: true }]} style={{ flex: 1 }}>
+                  <Input placeholder="例如：张三" />
+                </Form.Item>
+                <Form.Item name="targetDepartment" label="使用部门" rules={[{ required: true }]} style={{ flex: 1 }}>
+                  <Input placeholder="例如：技术部" />
+                </Form.Item>
+                <Form.Item name="targetPosition" label="岗位" rules={[{ required: true }]} style={{ flex: 1 }}>
+                  <Input placeholder="例如：前端开发" />
+                </Form.Item>
+              </div>
+            </div>
           )}
 
           {/* 动态联动：挂载 */}

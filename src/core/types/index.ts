@@ -71,7 +71,7 @@ export const OperationActionLabel: Record<OperationAction, string> = {
   [OperationAction.INBOUND_NEW]: '✨ 新购入库',
   [OperationAction.INBOUND_RECYCLE]: '♻️ 回收退库',
   [OperationAction.OUTBOUND]: '🚚 出库',
-  [OperationAction.TRANSFER]: '🔄 调拨',
+  [OperationAction.TRANSFER]: '🔄 库房调配',
   [OperationAction.MOUNT]: '🔌 挂载配件',
   [OperationAction.UNMOUNT]: '🛠️ 拆卸配件',
   [OperationAction.AUDIT_RECTIFY]: '盘点核销',
